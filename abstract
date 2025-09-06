@@ -1,0 +1,12 @@
+
+
+Brain Hamorrhage is a type of stroke, which occurs due to bursting of an artery in the brain, thus causing bleeding in the surrounding tissues.
+CT (Computed Tomography) images are used to diagnose bleeding and fractures in inner parts of the body. 
+CT images are preferred over MRI (Magnetic Resonance Imaging) images due to wider availability, lower cost and sensitiveness to early stroke.
+These images are first pre-processed, performed morphological operations on and then segmented using watershed algorithm.
+This extracted image is given as an input to an artificial neural network for classification.
+It also gives information on the haemorrhage area and the haemorrhage percentage. 
+These features are given as input to the classifier i.e., RNN. Using the training phase, the superimposed images are compared to the original image,
+such that the type of hemorrhage is detected and the error calculated. 
+In this paper by using RNN we will find the disease’s Epidural Hemorrhage, Intracranial Hemorrhage, Intraparenchymal Hemorrhage, Subarachnoid Hemorrhage and Subdural Hemorrhage.
+
