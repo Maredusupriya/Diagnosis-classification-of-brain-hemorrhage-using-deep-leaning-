@@ -1,0 +1,110 @@
+from flask import Flask, request, render_template, url_for
+import os
+import numpy as np
+import tensorflow as tf
+import cv2
+import base64
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+# Paths to the saved models
+DENSENET_MODEL_PATH = "model/densenet121_model.keras"
+XCEPTION_MODEL_PATH = "model/xception_model.keras"
+# Load the saved models
+densenet_model = tf.keras.models.load_model(DENSENET_MODEL_PATH)
+xception_model = tf.keras.models.load_model(XCEPTION_MODEL_PATH)
+# Create the Flask app
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Image preprocessing function
+def preprocess_image(image_path, target_size=(256, 256)):
+    img = load_img(image_path, target_size=target_size)
+    img_array = img_to_array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
+# Encryption Methods
+def apply_median_filter(image):
+    return cv2.medianBlur(image, 5)
+def apply_mean_filter(image):
+    return cv2.blur(image, (5, 5))
+def apply_maximum_filter(image):
+    return cv2.dilate(image, np.ones((5, 5), np.uint8))
+def apply_minimum_filter(image):
+    return cv2.erode(image, np.ones((5, 5), np.uint8))
+def negative_positive_transformation(image):
+    return 255 - image
+def color_shuffling(image):
+    channels = cv2.split(image)
+    shuffled_image = cv2.merge(channels[::-1])
+    return shuffled_image
+def block_based_statistical_smoothing(image, block_size=8):
+    h, w, _ = image.shape
+    for i in range(0, h, block_size):
+        for j in range(0, w, block_size):
+            block  =  image[i:i+block_size,  j:j+block_size]
+            mean_value = np.mean(block, axis = (0, 1))
+            image [i:i+block_size, j: j+block_size] = mean_value
+    return image
+def aes_encrypt_image(image):
+    key = b'16byteaeskey1234'  
+# AES Key (must be 16, 24, or 32 bytes)
+    cipher = AES.new(key, AES.MODE_CBC, iv=b'1234567890123456'
+    image_bytes = image.tobytes()
+    encrypted_bytes = cipher.encrypt(pad(image_bytes, AES.block_size))
+    encrypted_image = base64.b64encode(encrypted_bytes).decode('utf-8')
+    return encrypted_image
+# Prediction function
+def predict_custom_image(image_path):
+    img_array = preprocess_image(image_path)
+def index():
+    predictions = None
+    image_path = None
+    encrypted_images = {}
+    encrypted_image_paths = {}
+    aes_encrypted = ""
+    if request.method == 'POST':
+        if 'image' not in request.files:
+            return "No image uploaded", 400
+        image = request.files['image']
+        if image.filename == '':
+            return "No image selected", 400
+        # Save the uploaded file in the correct static path
+        filename = image.filename.replace(" ", "_")  
+       # Replace spaces for URL safety
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        image_path = image_path.replace("\\", "/")
+       # Convert to URL-compatible format
+        image.save(image_path)
+        # Read and process image
+        original_image = cv2.imread(image_path)
+        original_image = cv2.resize(original_image, (256, 256))
+        # Apply encryption methods
+encrypted_images['MedianFilter'] = apply_median_filter(original_image.copy())
+      encrypted_images['Mean Filter'] = apply_mean_filter(original_image.copy())
+encrypted_images['MaximumFilter']=apply_maximum_filter(original_image.copy()
+encrypted_images['MinimumFilter']=apply_minimum_filter(original_image.copy())
+encrypted_images['Negative-PositiveTransformation']=negative_positive_transformation(original_image.copy())
+encrypted_images['Color Shuffling'] = color_shuffling(original_image.copy())
+ encrypted_images['Block-based Statistical Smoothing'] = block_based_statistical_smoothing(original_image.copy())
+        aes_encrypted = aes_encrypt_image(original_image)
+        # Save encrypted images with correct paths
+        for key, img in encrypted_images.items():
+            if key != 'AES Encrypted':
+                enc_filename = f"{key.replace(' ', '_')}.png"
+                enc_path = os.path.join(app.config['UPLOAD_FOLDER'], enc_filename)
+                enc_path = enc_path.replace("\\", "/")  # Convert to web-compatible paths
+                cv2.imwrite(enc_path, img)
+                encrypted_image_paths[key] = enc_filename  # Store only filenames, not full paths
+
+        # Perform prediction
+        predictions = predict_custom_image(image_path)
+
+    return render_template('index.html',
+                           predictions=predictions,
+                           image_path=image_path.split('/')[-1] if image_path else None,  # Fix: Handle None case
+                           encrypted_images=encrypted_image_paths,
+                           aes_encrypted=aes_encrypted)
+
+if __name__ == "__main__":
+    app.run(debug=True)
